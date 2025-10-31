@@ -41,6 +41,33 @@ The script prints one line per step with the chosen action and IPC, and
 stores detailed statistics in `rl_runs/.../iter_XXXX_stats.json`.  A
 summary of the episode lives in `episode_summary.json`.
 
+## Checkpoint vs. Standalone comparison
+
+To quantify the effect of reusing cache checkpoints versus running each
+policy from scratch, use the helper script below.  It warmups the base
+policy once, replays each action window from that checkpoint, and then
+executes a full standalone run for the same action to highlight any IPC
+differences.
+
+```bash
+python -m rl_controller.compare_checkpoint \
+  --trace /path/to/trace.champsimtrace.xz \
+  --warmup 10000000 \
+  --window 50000000 \
+  --action l2c_prefetcher=next_line,llc_replacement=srrip \
+  --action l2c_prefetcher=ip_stride,llc_replacement=lru \
+  --include-base \
+  --output rl_runs/compare_perlbench
+```
+
+- `--include-base` adds the base action from `action_space.json` to the
+  comparison set.
+- By default, the standalone runs execute `warmup + resume_warmup`
+  instructions before the measurement window; override with
+  `--resume-solo` if you prefer a different warmup length.
+- Results and per-run statistics are saved under the chosen output
+  directory together with a machine-readable `comparison_summary.json`.
+
 ### Notes
 
 - The harness reuses a warm checkpoint created once with the base action.
