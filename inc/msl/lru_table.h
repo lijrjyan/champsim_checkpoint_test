@@ -180,6 +180,56 @@ public:
 
   lru_table(std::size_t sets, std::size_t ways, SetProj set_proj) : lru_table(sets, ways, set_proj, {}) {}
   lru_table(std::size_t sets, std::size_t ways) : lru_table(sets, ways, {}, {}) {}
+
+  struct checkpoint_entry {
+    long set = 0;
+    long way = 0;
+    uint64_t last_used = 0;
+    value_type data{};
+  };
+
+  std::vector<checkpoint_entry> checkpoint_contents() const
+  {
+    std::vector<checkpoint_entry> entries;
+    entries.reserve(block.size());
+
+    for (diff_type set = 0; set < NUM_SET; ++set) {
+      for (diff_type way = 0; way < NUM_WAY; ++way) {
+        const auto& blk = block.at(static_cast<std::size_t>(set) * static_cast<std::size_t>(NUM_WAY) + static_cast<std::size_t>(way));
+        if (blk.last_used == 0) {
+          continue;
+        }
+        entries.push_back(checkpoint_entry{set, way, blk.last_used, blk.data});
+      }
+    }
+
+    return entries;
+  }
+
+  void restore_checkpoint(const std::vector<checkpoint_entry>& entries)
+  {
+    clear();
+
+    for (const auto& entry : entries) {
+      if (entry.set < 0 || entry.set >= NUM_SET) {
+        throw std::out_of_range("lru_table checkpoint set out of range");
+      }
+
+      if (entry.way < 0 || entry.way >= NUM_WAY) {
+        throw std::out_of_range("lru_table checkpoint way out of range");
+      }
+
+      auto index = static_cast<std::size_t>(entry.set) * static_cast<std::size_t>(NUM_WAY) + static_cast<std::size_t>(entry.way);
+      block.at(index) = block_t{entry.last_used, entry.data};
+      access_count = std::max(access_count, entry.last_used);
+    }
+  }
+
+  void clear()
+  {
+    access_count = 0;
+    std::fill(std::begin(block), std::end(block), block_t{});
+  }
 };
 } // namespace champsim::msl
 

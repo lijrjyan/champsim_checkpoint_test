@@ -34,6 +34,7 @@
 #include <vector>
 
 #include "bandwidth.h"
+#include "btb_checkpoint_types.h"
 #include "champsim.h"
 #include "channel.h"
 #include "core_builder.h"
@@ -195,12 +196,14 @@ public:
     virtual bool impl_predict_branch(champsim::address ip, champsim::address predicted_target, bool always_taken, uint8_t branch_type) = 0;
   };
 
-  struct btb_module_concept {
+struct btb_module_concept {
     virtual ~btb_module_concept() = default;
 
     virtual void impl_initialize_btb() = 0;
     virtual void impl_update_btb(champsim::address ip, champsim::address predicted_target, bool taken, uint8_t branch_type) = 0;
     virtual std::pair<champsim::address, bool> impl_btb_prediction(champsim::address ip, uint8_t branch_type) = 0;
+    virtual std::optional<champsim::btb_checkpoint_state> impl_checkpoint_contents() const = 0;
+    virtual void impl_restore_checkpoint(const champsim::btb_checkpoint_state& state) = 0;
   };
 
   template <typename... Bs>
@@ -221,6 +224,8 @@ public:
     void impl_initialize_btb() final;
     void impl_update_btb(champsim::address ip, champsim::address predicted_target, bool taken, uint8_t branch_type) final;
     [[nodiscard]] std::pair<champsim::address, bool> impl_btb_prediction(champsim::address ip, uint8_t branch_type) final;
+    [[nodiscard]] std::optional<champsim::btb_checkpoint_state> impl_checkpoint_contents() const final;
+    void impl_restore_checkpoint(const champsim::btb_checkpoint_state& state) final;
   };
 
   std::unique_ptr<branch_module_concept> branch_module_pimpl;
@@ -234,6 +239,11 @@ public:
   void impl_initialize_btb() const;
   void impl_update_btb(champsim::address ip, champsim::address predicted_target, bool taken, uint8_t branch_type) const;
   [[nodiscard]] std::pair<champsim::address, bool> impl_btb_prediction(champsim::address ip, uint8_t branch_type) const;
+  [[nodiscard]] std::optional<champsim::btb_checkpoint_state> impl_btb_checkpoint_contents() const;
+  void impl_restore_btb_checkpoint(const champsim::btb_checkpoint_state& state) const;
+
+  [[nodiscard]] std::optional<champsim::btb_checkpoint_state> btb_checkpoint_contents() const { return impl_btb_checkpoint_contents(); }
+  void restore_btb_checkpoint(const champsim::btb_checkpoint_state& state) const { impl_restore_btb_checkpoint(state); }
   // NOLINTEND(readability-make-member-function-const)
 
   template <typename... Bs, typename... Ts>
@@ -367,6 +377,34 @@ std::pair<champsim::address, bool> O3_CPU::btb_module_model<Ts...>::impl_btb_pre
     return std::apply([&](auto&... t) { return (..., process_one(t)); }, intern_);
   }
   return return_type{};
+}
+
+template <typename... Ts>
+std::optional<champsim::btb_checkpoint_state> O3_CPU::btb_module_model<Ts...>::impl_checkpoint_contents() const
+{
+  std::optional<champsim::btb_checkpoint_state> result;
+  [[maybe_unused]] auto process_one = [&](const auto& t) {
+    using namespace champsim::modules;
+    if constexpr (btb::has_checkpoint_contents<decltype(t)>) {
+      result = t.checkpoint_contents();
+    }
+  };
+
+  std::apply([&](const auto&... t) { (..., process_one(t)); }, intern_);
+  return result;
+}
+
+template <typename... Ts>
+void O3_CPU::btb_module_model<Ts...>::impl_restore_checkpoint(const champsim::btb_checkpoint_state& state)
+{
+  [[maybe_unused]] auto process_one = [&](auto& t) {
+    using namespace champsim::modules;
+    if constexpr (btb::has_restore_checkpoint<decltype(t)>) {
+      t.restore_checkpoint(state);
+    }
+  };
+
+  std::apply([&](auto&... t) { (..., process_one(t)); }, intern_);
 }
 
 #ifdef SET_ASIDE_CHAMPSIM_MODULE

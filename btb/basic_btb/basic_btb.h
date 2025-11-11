@@ -2,6 +2,7 @@
 #define BTB_BASIC_BTB_H
 
 #include "address.h"
+#include "btb_checkpoint_types.h"
 #include "direct_predictor.h"
 #include "indirect_predictor.h"
 #include "modules.h"
@@ -20,6 +21,8 @@ public:
   // void initialize_btb();
   std::pair<champsim::address, bool> btb_prediction(champsim::address ip);
   void update_btb(champsim::address ip, champsim::address branch_target, bool taken, uint8_t branch_type);
+  [[nodiscard]] champsim::btb_checkpoint_state checkpoint_contents() const;
+  void restore_checkpoint(const champsim::btb_checkpoint_state& state);
 };
 
 #endif

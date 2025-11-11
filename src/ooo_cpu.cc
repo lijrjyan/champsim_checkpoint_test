@@ -754,6 +754,22 @@ std::pair<champsim::address, bool> O3_CPU::impl_btb_prediction(champsim::address
   return btb_module_pimpl->impl_btb_prediction(ip, branch_type);
 }
 
+std::optional<champsim::btb_checkpoint_state> O3_CPU::impl_btb_checkpoint_contents() const
+{
+  if (!btb_module_pimpl) {
+    return std::nullopt;
+  }
+  return btb_module_pimpl->impl_checkpoint_contents();
+}
+
+void O3_CPU::impl_restore_btb_checkpoint(const champsim::btb_checkpoint_state& state) const
+{
+  if (!btb_module_pimpl) {
+    return;
+  }
+  btb_module_pimpl->impl_restore_checkpoint(state);
+}
+
 // LCOV_EXCL_START Exclude the following function from LCOV
 void O3_CPU::print_deadlock()
 {

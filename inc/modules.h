@@ -24,6 +24,7 @@
 #include "access_type.h"
 #include "address.h"
 #include "block.h"
+#include "btb_checkpoint_types.h"
 #include "champsim.h"
 
 class CACHE;
@@ -89,6 +90,16 @@ struct btb : public bound_to<O3_CPU> {
   template <typename, typename...>
   static auto predict_branch_member_impl(long) -> std::false_type;
 
+  template <typename T>
+  static auto checkpoint_contents_member_impl(int) -> decltype(std::declval<const T>().checkpoint_contents(), std::true_type{});
+  template <typename>
+  static auto checkpoint_contents_member_impl(long) -> std::false_type;
+
+  template <typename T>
+  static auto restore_checkpoint_member_impl(int) -> decltype(std::declval<T>().restore_checkpoint(std::declval<const champsim::btb_checkpoint_state&>()), std::true_type{});
+  template <typename>
+  static auto restore_checkpoint_member_impl(long) -> std::false_type;
+
   template <typename T, typename... Args>
   constexpr static bool has_initialize = decltype(initialize_member_impl<T, Args...>(0))::value;
 
@@ -97,6 +108,12 @@ struct btb : public bound_to<O3_CPU> {
 
   template <typename T, typename... Args>
   constexpr static bool has_btb_prediction = decltype(predict_branch_member_impl<T, Args...>(0))::value;
+
+  template <typename T>
+  constexpr static bool has_checkpoint_contents = decltype(checkpoint_contents_member_impl<T>(0))::value;
+
+  template <typename T>
+  constexpr static bool has_restore_checkpoint = decltype(restore_checkpoint_member_impl<T>(0))::value;
 };
 
 struct prefetcher : public bound_to<CACHE> {
